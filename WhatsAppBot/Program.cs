@@ -15,6 +15,18 @@ namespace WhatsAppBot
         static Page _whatsAppPage;
         private static StringMarkov _model;
 
+        internal class WhatsAppMetadata
+        {
+            public const string WhatsAppURL = "https://web.whatsapp.com/";
+            public const string MainPanel = "#pane-side";
+            public const string SearchInput = ".jN-F5";
+            public const string PersonItem = "._2wP_Y";
+            public const string MessageLine = "vW7d1";
+            public static string ChatContainer = "._9tCEa";
+            public static string ChatInput = "._2S1VP";
+            public static string SendMessageButton = "._35EW6";
+        }
+
         static async Task Main(string[] args)
         {
             await Parser.Default.ParseArguments<BotArguments>(args).MapResult(
@@ -35,12 +47,13 @@ namespace WhatsAppBot
         private static async Task InitWhatsAppAsync(BotArguments args)
         {
             _whatsAppPage = await _browser.NewPageAsync();
-            await _whatsAppPage.GoToAsync("https://web.whatsapp.com/");
-            await _whatsAppPage.WaitForSelectorAsync("#pane-side");
-            var input = (await _whatsAppPage.XPathAsync("//input[@title=\"Search or start new chat\"]")).First();
+            await _whatsAppPage.GoToAsync(WhatsAppMetadata.WhatsAppURL);
+            await _whatsAppPage.WaitForSelectorAsync(WhatsAppMetadata.MainPanel);
+
+            var input = await _whatsAppPage.QuerySelectorAsync(WhatsAppMetadata.SearchInput);
             await input.TypeAsync(args.ChatName);
             await _whatsAppPage.WaitForTimeoutAsync(500);
-            var menuItem = (await _whatsAppPage.QuerySelectorAllAsync("._2wP_Y")).ElementAt(1);
+            var menuItem = (await _whatsAppPage.QuerySelectorAllAsync(WhatsAppMetadata.PersonItem)).ElementAt(1);
             await menuItem.ClickAsync();
 
             await _whatsAppPage.ExposeFunctionAsync("newChat", async (string text) =>
@@ -56,16 +69,16 @@ namespace WhatsAppBot
                 await File.AppendAllTextAsync(args.SourceText, text + "\n");
             });
 
-            await _whatsAppPage.EvaluateFunctionAsync(@"() => {
-                var observer = new MutationObserver((mutations) => { 
-                    for(var mutation of mutations) {
-                        if(mutation.addedNodes.length && mutation.addedNodes[0].classList.value === 'vW7d1') {
+            await _whatsAppPage.EvaluateFunctionAsync($@"() => {{
+                var observer = new MutationObserver((mutations) => {{
+                    for(var mutation of mutations) {{
+                        if(mutation.addedNodes.length && mutation.addedNodes[0].classList.value === '{WhatsAppMetadata.MessageLine}') {{
                             newChat(mutation.addedNodes[0].querySelector('.copyable-text span').innerText);
-                        }
-                    }
-                });
-                observer.observe(document.querySelector('._9tCEa'), { attributes: false, childList: true, subtree: true });
-            }");
+                        }}
+                    }}
+                }});
+                observer.observe(document.querySelector('{WhatsAppMetadata.ChatContainer}'), {{ attributes: false, childList: true, subtree: true }});
+            }}");
         }
 
         private static async Task InitBrowserAsync(BotArguments args)
@@ -111,9 +124,9 @@ namespace WhatsAppBot
 
         private static async Task WriteChatAsync(string text)
         {
-            var chatInput = (await _whatsAppPage.QuerySelectorAllAsync("._2S1VP")).First();
+            var chatInput = await _whatsAppPage.QuerySelectorAsync(WhatsAppMetadata.ChatInput);
             await chatInput.TypeAsync(text);
-            await (await _whatsAppPage.QuerySelectorAsync("._35EW6")).ClickAsync();
+            await (await _whatsAppPage.QuerySelectorAsync(WhatsAppMetadata.SendMessageButton)).ClickAsync();
         }
     }
 }
